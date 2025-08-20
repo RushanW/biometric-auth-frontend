@@ -1,63 +1,46 @@
+// src/app/consent/page.tsx
 'use client';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Link from 'next/link';
 
 export default function ConsentPage() {
-  const [agree, setAgree] = useState(false);
-  const router = useRouter();
+  const [c1, setC1] = useState(false);
+  const [c2, setC2] = useState(false);
+
+  const canContinue = c1 && c2;
 
   return (
-    <main className="mx-auto max-w-3xl">
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 md:p-7">
-        <h1 className="text-xl font-semibold">Consent</h1>
-        <p className="mt-2 text-sm text-neutral-300">
-          We use your camera to confirm it’s really you. Processing happens on your device where possible; only a compact
-          template is sent to the server. You can delete your biometric data anytime in Settings.
+    <main className="mx-auto max-w-xl p-6">
+      <h1 className="mb-4 text-2xl font-semibold">Consent</h1>
+      <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-4 text-sm text-neutral-300">
+        <p className="mb-3">
+          We use your camera to capture facial biometrics to enable Face sign-in.
+          Data is stored securely and used only for authentication.
         </p>
-
-        <ul className="mt-4 space-y-2 text-sm text-neutral-400">
-          <li>• Purpose: authentication & fraud prevention</li>
-          <li>• Storage: feature vectors, not raw images</li>
-          <li>• Retention: until you delete or your account is removed</li>
-        </ul>
-
-        <label className="mt-6 flex items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={agree}
-            onChange={(e) => setAgree(e.target.checked)}
-          />
-          <span>
-            I agree to biometric processing for authentication.
-            {' '}
-            <Link href="/privacy" className="text-neutral-200 underline underline-offset-4 hover:text-white">
-              Privacy Policy
-            </Link>
-          </span>
+        <label className="mb-2 flex items-start gap-2">
+          <input type="checkbox" checked={c1} onChange={e => setC1(e.target.checked)} />
+          <span>I consent to the collection and processing of my facial biometrics.</span>
         </label>
-
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            disabled={!agree}
-            onClick={() => router.push('/device-check')}
-            className="rounded-xl border border-emerald-500/30 bg-emerald-600/15 px-4 py-2 text-sm ring-1 ring-inset ring-emerald-500/20 hover:bg-emerald-600/25 disabled:opacity-50"
+        <label className="mb-4 flex items-start gap-2">
+          <input type="checkbox" checked={c2} onChange={e => setC2(e.target.checked)} />
+          <span>I understand I can revoke consent and delete my data at any time.</span>
+        </label>
+        <div className="flex gap-2">
+          <Link
+            href={canContinue ? '/enroll/guide' : '#'}
+            aria-disabled={!canContinue}
+            className={`rounded-xl border px-4 py-2 ${canContinue
+              ? 'border-blue-500/40 bg-blue-600/15 text-blue-200 hover:bg-blue-600/25'
+              : 'cursor-not-allowed border-neutral-800 text-neutral-500'}`}
+            onClick={(e) => { if (!canContinue) e.preventDefault(); sessionStorage.setItem('consent:version', 'v1.0'); }}
           >
             Continue
-          </button>
-          <Link
-            href="/"
-            className="rounded-xl border border-neutral-800 px-4 py-2 text-sm text-neutral-400 hover:border-neutral-600"
-          >
+          </Link>
+          <Link className="rounded-xl border border-neutral-800 px-4 py-2 text-neutral-400 hover:border-neutral-600" href="/">
             Cancel
           </Link>
         </div>
-
-        <p className="mt-4 text-xs text-neutral-500">
-          Can’t use your camera? Try <Link href="/recovery" className="underline underline-offset-4">recovery options</Link>.
-        </p>
-      </section>
+      </div>
     </main>
   );
 }

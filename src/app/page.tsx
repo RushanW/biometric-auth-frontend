@@ -29,7 +29,7 @@ export default function HomePage() {
 
           <div className="mt-5 space-y-3">
             <Link
-              href="/consent"
+              href="/auth/face"
               className="group inline-flex w-full items-center justify-between rounded-xl border border-neutral-700 bg-white/[0.03] px-4 py-3 outline-none ring-0 transition hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               aria-label="Continue with Face"
             >
@@ -46,7 +46,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              href="/webauthn"
+              href="/auth/passkey"
               className="inline-flex w-full items-center justify-between rounded-xl border border-neutral-700 bg-white/[0.02] px-4 py-3 text-sm outline-none transition hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               aria-label="Use Passkey"
             >
@@ -58,7 +58,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              href="/recovery"
+              href="/auth/otp"
               className="inline-flex w-full items-center justify-between rounded-xl border border-neutral-700 bg-white/[0.02] px-4 py-3 text-sm outline-none transition hover:bg-white/[0.05] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               aria-label="Get OTP"
             >
