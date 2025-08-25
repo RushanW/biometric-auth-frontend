@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+/* Force light mode defaults */
+:root {
+  color-scheme: light;
+}
+
+html, body, #__next { height: 100%; }
+ 

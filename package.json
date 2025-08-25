@@ -13,9 +13,10 @@
     "face-api.js": "0.22.2",
     "next": "15.4.4",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-icons": "^5.5.0"
   },
-    "overrides": {
+  "overrides": {
     "@tensorflow/tfjs": "3.21.0",
     "@tensorflow/tfjs-core": "3.21.0",
     "@tensorflow/tfjs-backend-webgl": "3.21.0",
