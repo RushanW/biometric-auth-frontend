@@ -56,11 +56,11 @@ function yawApprox(lm: faceapi.FaceLandmarks68) {
 // classic blue box + red score
 function drawBox(canvas: HTMLCanvasElement, box: faceapi.Box, score?: number) {
   const ctx = canvas.getContext('2d')!;
-  ctx.strokeStyle = '#00F';
+  ctx.strokeStyle = '#3b82f6'; // tailwind blue-500
   ctx.lineWidth = 2;
   ctx.strokeRect(box.x, box.y, box.width, box.height);
-  ctx.fillStyle = '#F00';
-  ctx.font = '14px Arial, sans-serif';
+  ctx.fillStyle = '#ef4444'; // red-500
+  ctx.font = '14px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
   const y = Math.max(0, box.y - 16);
   ctx.fillText((score ?? 0).toFixed(2), box.x + 2, y);
 }
@@ -76,7 +76,11 @@ export default function LivenessPage() {
   const [modelsReady, setModelsReady] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [canContinue, setCanContinue] = useState(false);
+
+  // expose hold progress for UI
   const holdRef = useRef(0);
+  const [holdCount, setHoldCount] = useState(0);
+
   const [stats, setStats] = useState({ faces: 0, fps: 0, conf: 0, size: '0×0' });
 
   const onCameraReady = useCallback((v: HTMLVideoElement) => {
@@ -93,7 +97,7 @@ export default function LivenessPage() {
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL), // for descriptor
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
         ]);
         if (!cancelled) setModelsReady(true);
       } catch (e) {
@@ -154,13 +158,17 @@ export default function LivenessPage() {
         const goodConf = conf >= MIN_CONFIDENCE;
         const goodSize = bw >= v.videoWidth * MIN_FACE_RATIO && bh >= v.videoHeight * MIN_FACE_RATIO;
 
-        if (goodConf && goodSize) holdRef.current = Math.min(holdRef.current + 1, GOOD_HOLD_FRAMES);
-        else holdRef.current = Math.max(0, holdRef.current - 1);
-
+        if (goodConf && goodSize) {
+          holdRef.current = Math.min(holdRef.current + 1, GOOD_HOLD_FRAMES);
+        } else {
+          holdRef.current = Math.max(0, holdRef.current - 1);
+        }
+        setHoldCount(holdRef.current);
         setCanContinue(holdRef.current >= GOOD_HOLD_FRAMES);
       } else {
         setStats({ faces: 0, fps: Math.max(1, Math.round(1000 / dt)), conf: 0, size: '0×0' });
         holdRef.current = Math.max(0, holdRef.current - 1);
+        setHoldCount(holdRef.current);
         setCanContinue(false);
       }
 
@@ -181,7 +189,6 @@ export default function LivenessPage() {
     const v = videoRef.current;
     if (!v) return;
 
-    // 1) compute descriptor
     const det = await faceapi
       .detectSingleFace(v, DETECTOR_OPTS)
       .withFaceLandmarks(true)
@@ -191,24 +198,20 @@ export default function LivenessPage() {
       return;
     }
 
-    // 2) features
     const lm = det.landmarks;
     const leftEAR = ear(lm.getLeftEye());
     const rightEAR = ear(lm.getRightEye());
     const mouthMAR = mar(lm.getMouth());
     const yaw = yawApprox(lm);
 
-    // 3) snapshot image
     const snapCanvas = document.createElement('canvas');
     snapCanvas.width = v.videoWidth; snapCanvas.height = v.videoHeight;
     const sctx = snapCanvas.getContext('2d')!;
-    // mirror matches preview (adjust if you don’t mirror your video)
     sctx.translate(snapCanvas.width, 0);
     sctx.scale(-1, 1);
     sctx.drawImage(v, 0, 0, snapCanvas.width, snapCanvas.height);
     const imageDataUrl = snapCanvas.toDataURL('image/png');
 
-    // 4) save snapshot using your helper
     const snapshot: EnrollmentSnapshot = {
       imageDataUrl,
       features: { leftEAR, rightEAR, mouthMAR, yaw },
@@ -218,7 +221,6 @@ export default function LivenessPage() {
     };
     saveEnrollmentSnapshot(snapshot);
 
-    // 5) stash pending enrollment user+descriptor
     const pending = {
       userId, name: userName, email: userEmail,
       descriptor: Array.from(det.descriptor),
@@ -226,7 +228,6 @@ export default function LivenessPage() {
     };
     sessionStorage.setItem('pendingEnrollment', JSON.stringify(pending));
 
-    // 6) go review
     window.location.href = '/enroll/review';
   }
 
@@ -238,54 +239,124 @@ export default function LivenessPage() {
     />
   );
 
+  const progressPct = Math.round((holdCount / GOOD_HOLD_FRAMES) * 100);
+
   return (
-    <main className="mx-auto max-w-4xl p-6">
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-6 text-neutral-100">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="mb-2 text-lg font-medium">Face Detection</h2>
-            <p className="text-sm text-neutral-400">Hold steady until the button unlocks. We’ll capture a snapshot + features.</p>
+    <main className="mx-auto max-w-5xl p-6 md:p-8">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-20 -mx-6 md:-mx-8 mb-6 border-b border-neutral-800/80 bg-neutral-950/80 backdrop-blur">
+        <div className="mx-6 md:mx-8 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900 px-3 py-1.5 text-sm text-neutral-200 hover:bg-neutral-800"
+              aria-label="Go Back"
+            >
+              ← Back
+            </button>
+            <h1 className="text-base md:text-lg font-medium text-neutral-100">Liveness Check</h1>
           </div>
           <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${isDetecting ? (stats.faces > 0 ? 'bg-green-500' : 'bg-yellow-500') : 'bg-red-500'}`} />
-            <span className="text-sm text-neutral-400">{isDetecting ? (stats.faces > 0 ? 'Face Detected' : 'Searching...') : 'Inactive'}</span>
+            <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium
+              ${isDetecting ? (stats.faces > 0 ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-600/40' : 'bg-amber-600/20 text-amber-300 border border-amber-600/40')
+                           : 'bg-rose-600/20 text-rose-300 border border-rose-600/40'}`}>
+              {isDetecting ? (stats.faces > 0 ? 'Face Detected' : 'Searching…') : 'Inactive'}
+            </span>
+            <span className="text-xs text-neutral-400">{stats.fps} fps</span>
+          </div>
+        </div>
+      </div>
+
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5 md:p-6 text-neutral-100 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+        {/* Guidance / progress */}
+        <div className="mb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h2 className="mb-1 text-lg font-medium">Face Detection</h2>
+            <p className="text-sm text-neutral-400">
+              Hold steady until the progress reaches 100%. Then continue to review.
+            </p>
+          </div>
+
+          {/* Hold progress bar */}
+          <div className="w-full md:w-64">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-neutral-400">Hold Progress</span>
+              <span className="text-xs text-neutral-300">{progressPct}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-neutral-800 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${canContinue ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                style={{ width: `${progressPct}%` }}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={progressPct}
+                role="progressbar"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="mb-4 p-3 rounded-lg border border-neutral-800 bg-neutral-950">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><span className="font-medium">Faces:</span> <span className="ml-2">{stats.faces}</span></div>
-            <div><span className="font-medium">Confidence:</span> <span className="ml-2">{(stats.conf * 100).toFixed(1)}%</span></div>
-            <div><span className="font-medium">Size:</span> <span className="ml-2">{stats.size}</span></div>
-            <div><span className="font-medium">FPS:</span> <span className="ml-2">{stats.fps}</span></div>
+        {/* Stats chips */}
+        <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
+            <div className="text-neutral-400 text-xs">Faces</div>
+            <div className="font-medium">{stats.faces}</div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
+            <div className="text-neutral-400 text-xs">Confidence</div>
+            <div className={`font-medium ${stats.conf >= MIN_CONFIDENCE ? 'text-emerald-400' : 'text-amber-300'}`}>
+              {(stats.conf * 100).toFixed(1)}%
+            </div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
+            <div className="text-neutral-400 text-xs">Face Size</div>
+            <div className="font-medium">{stats.size}</div>
+          </div>
+          <div className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2">
+            <div className="text-neutral-400 text-xs">FPS</div>
+            <div className="font-medium">{stats.fps}</div>
           </div>
         </div>
 
+        {/* Camera area */}
         <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-neutral-800 bg-black">
           <CameraFeed ref={camRef} onReady={onCameraReady} overlay={overlay} facingMode="user" mirror />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 m-2 rounded bg-black/70 px-3 py-2 text-sm text-white flex justify-between">
-            <span>{stats.faces > 0 ? (canContinue ? 'Good! You can continue.' : 'Face detected. Hold steady…') : 'No face detected.'}</span>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 m-2 rounded-lg bg-black/65 px-3 py-2 text-sm text-white flex items-center justify-between">
+            <span>
+              {stats.faces > 0
+                ? (canContinue ? 'Great! You can continue.' : 'Face detected — hold steady…')
+                : 'No face detected.'}
+            </span>
             <span className="text-xs opacity-75">{stats.fps} fps</span>
           </div>
         </div>
 
-        <div className="mt-4 flex gap-3">
+        {/* Actions */}
+        <div className="mt-5 flex flex-wrap gap-3">
           <button
             onClick={handleContinue}
             disabled={!canContinue}
-            className={`rounded-xl border px-4 py-2 text-sm transition-colors ${
-              canContinue
+            className={`rounded-xl border px-4 py-2 text-sm transition-colors
+              ${canContinue
                 ? 'border-emerald-400 bg-emerald-600 text-white hover:bg-emerald-500'
-                : 'border-neutral-700 bg-neutral-800 text-neutral-500 cursor-not-allowed'
-            }`}
+                : 'border-neutral-700 bg-neutral-800 text-neutral-500 cursor-not-allowed'}`}
           >
             Continue to Review
           </button>
+
           <button
-            onClick={() => { holdRef.current = 0; setCanContinue(false); }}
+            onClick={() => { holdRef.current = 0; setHoldCount(0); setCanContinue(false); }}
             className="rounded-xl border border-blue-400/30 bg-blue-900/20 px-4 py-2 text-sm text-blue-200 hover:bg-blue-900/30"
           >
             Reset
+          </button>
+
+          <button
+            onClick={() => router.back()}
+            className="rounded-xl border border-neutral-700 bg-neutral-850 px-4 py-2 text-sm text-neutral-200 hover:bg-neutral-800"
+            aria-label="Back"
+          >
+            ← Back
           </button>
         </div>
       </section>
